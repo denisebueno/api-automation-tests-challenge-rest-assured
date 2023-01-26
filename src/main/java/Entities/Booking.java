@@ -9,6 +9,10 @@ public class Booking {
     private BookingDates bookingdates;
     private String additionalneeds;
 
+    public Booking() {
+        super();
+    }
+
     public Booking(String firstName, String lastName, float totalPrice, boolean depositPaid, BookingDates bookingDates, String additionalNeeds) {
         this.firstname = firstName;
         this.lastname = lastName;

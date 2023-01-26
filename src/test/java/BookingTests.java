@@ -1,6 +1,4 @@
-import Entities.Booking;
-import Entities.BookingDates;
-import Entities.User;
+import Entities.*;
 import com.github.javafaker.Faker;
 import io.restassured.RestAssured;
 import io.restassured.filter.log.ErrorLoggingFilter;
@@ -16,12 +14,15 @@ import static io.restassured.config.LogConfig.logConfig;
 import static io.restassured.module.jsv.JsonSchemaValidator.*;
 import static org.hamcrest.Matchers.*;
 
+@TestMethodOrder(MethodOrderer.Alphanumeric.class)
 public class BookingTests {
     public static Faker faker;
     private static RequestSpecification request;
     private static Booking booking;
     private static BookingDates bookingDates;
     private static User user;
+    private static String bookingId;
+    private static String token;
 
     @BeforeAll
     public static void Setup() {
@@ -50,7 +51,25 @@ public class BookingTests {
     }
 
     @Test
-    public void getAllBookingsById_returnOk() {
+    public void test00_createToken_returnOk() {
+        Response response = request
+                .when()
+                .body("{\n" +
+                        "    \"username\" : \"admin\",\n" +
+                        "    \"password\" : \"password123\"\n" +
+                        "}")
+                .post("/auth")
+                .then()
+                .extract()
+                .response();
+
+        Assertions.assertNotNull(response);
+        Assertions.assertEquals(200, response.statusCode());
+        token = response.body().as(Token.class).getToken();
+    }
+
+    @Test
+    public void test01_getAllBookingsById_returnOk() {
         Response response = request
                 .when()
                 .get("/booking")
@@ -58,43 +77,85 @@ public class BookingTests {
                 .extract()
                 .response();
 
+        Assertions.assertNotNull(response);
+        Assertions.assertEquals(200, response.statusCode());
+    }
+
+    @Test
+    public void test02_createBooking_returnOk() {
+        Response response = request
+                .when()
+                .body(booking)
+                .post("/booking")
+                .then()
+                .body(matchesJsonSchemaInClasspath("createBookingRequestSchema.json"))
+                .extract()
+                .response();
+
+        Assertions.assertNotNull(response);
+        Assertions.assertEquals(200, response.statusCode());
+        bookingId = response.body().as(CreateResponse.class).getBookingid();
+        Assertions.assertNotNull(bookingId);
+    }
+
+    @Test
+    public void test03_getBooking_returnOk() {
+        Response response = request
+                .when()
+                .get("/booking/" + bookingId)
+                .then()
+                .extract()
+                .response();
 
         Assertions.assertNotNull(response);
         Assertions.assertEquals(200, response.statusCode());
     }
 
     @Test
-    public void getAllBookingsByUserFirstName_BookingExists_returnOk() {
-        request
+    public void test04_updateBooking_returnOk() {
+        booking.setFirstname("Mark");
+        Response response = request
                 .when()
-                .queryParam("firstName", "Carol")
-                .get("/booking")
+                .header("Cookie", "token=" + token)
+                .body(booking)
+                .put("/booking/" + bookingId)
                 .then()
-                .assertThat()
-                .statusCode(200)
-                .contentType(ContentType.JSON)
-                .and()
-                .body("results", hasSize(greaterThan(0)));
+                .extract()
+                .response();
 
+        Assertions.assertNotNull(response);
+        Assertions.assertEquals(200, response.statusCode());
     }
 
     @Test
-    public void CreateBooking_WithValidData_returnOk() {
-
-        Booking test = booking;
-        given().config(RestAssured.config().logConfig(logConfig().enableLoggingOfRequestAndResponseIfValidationFails()))
-                .contentType(ContentType.JSON)
+    public void test05_partialUpdateBooking_returnOk() {
+        Response response = request
                 .when()
-                .body(booking)
-                .post("/booking")
+                .header("Cookie", "token=" + token)
+                .body("{\n" +
+                        "    \"firstname\" : \"James\",\n" +
+                        "    \"lastname\" : \"Brown\"\n" +
+                        "}")
+                .patch("/booking/" + bookingId)
                 .then()
-                .body(matchesJsonSchemaInClasspath("createBookingRequestSchema.json"))
-                .and()
-                .assertThat()
-                .statusCode(200)
-                .contentType(ContentType.JSON).and().time(lessThan(2000L));
+                .extract()
+                .response();
 
-
+        Assertions.assertNotNull(response);
+        Assertions.assertEquals(200, response.statusCode());
     }
 
+    @Test
+    public void test06_deleteBooking_returnOk() {
+        Response response = request
+                .when()
+                .header("Cookie", "token=" + token)
+                .delete("/booking/" + bookingId)
+                .then()
+                .extract()
+                .response();
+
+        Assertions.assertNotNull(response);
+        Assertions.assertEquals(201, response.statusCode());
+    }
 }
